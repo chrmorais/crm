@@ -19,7 +19,10 @@
  */
 package com.odoo.core.account;
 
+import android.accounts.Account;
+import android.accounts.AccountManager;
 import android.graphics.Bitmap;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v7.app.ActionBarActivity;
 import android.text.TextUtils;
@@ -28,20 +31,26 @@ import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.odoo.core.auth.OdooAccountManager;
 import com.odoo.core.service.OSyncAdapter;
 import com.odoo.core.support.OUser;
+import com.odoo.core.support.OdooLoginHelper;
 import com.odoo.core.utils.BitmapUtils;
+import com.odoo.core.utils.logger.OLog;
 import com.odoo.core.utils.notification.ONotificationBuilder;
 import com.odoo.crm.R;
 
 public class OdooAccountQuickManage extends ActionBarActivity implements View.OnClickListener {
     public static final String TAG = OdooAccountQuickManage.class.getSimpleName();
-    private OUser user = null;
+    private OUser mUser = null;
     private ImageView userAvatar;
     private TextView txvName;
+    private Account account;
+    private OdooLoginHelper loginHelper;
+    private LoginProcess loginProcess = null;
+    private EditText edtPassword;
+    private String action;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,26 +58,31 @@ public class OdooAccountQuickManage extends ActionBarActivity implements View.On
         setContentView(R.layout.base_account_quick_manage);
         getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         getSupportActionBar().hide();
-
+        action = getIntent().getAction();
+        OLog.log(">>>  " + action);
         // Removing notification
         ONotificationBuilder.cancelNotification(this, OSyncAdapter.REQUEST_SIGN_IN_ERROR);
-        user = OdooAccountManager.getDetails(this, getIntent().getStringExtra("android_name"));
-        init();
-        findViewById(R.id.cancel).setOnClickListener(this);
-        findViewById(R.id.save_password).setOnClickListener(this);
+        mUser = OdooAccountManager.getDetails(this, getIntent().getStringExtra("android_name"));
+        if (action.equals("remove_account")) {
+            removePassword();
+        } else {
+            init();
+            findViewById(R.id.cancel).setOnClickListener(this);
+            findViewById(R.id.save_password).setOnClickListener(this);
+        }
     }
 
     private void init() {
         userAvatar = (ImageView) findViewById(R.id.userAvatar);
-        Bitmap userImage = BitmapUtils.getAlphabetImage(this, user.getName());
-        if (!user.getAvatar().equals("false")) {
-            userImage = BitmapUtils.getBitmapImage(this, user.getAvatar());
+        Bitmap userImage = BitmapUtils.getAlphabetImage(this, mUser.getName());
+        if (!mUser.getAvatar().equals("false")) {
+            userImage = BitmapUtils.getBitmapImage(this, mUser.getAvatar());
         }
         userAvatar.setImageBitmap(userImage);
-
-        // Name
         txvName = (TextView) findViewById(R.id.userName);
-        txvName.setText(user.getName());
+        txvName.setText(mUser.getName());
+        Account[] accounts = AccountManager.get(getApplicationContext()).getAccountsByType(OdooAccountManager.KEY_ACCOUNT_TYPE);
+        account = accounts[0];
     }
 
     @Override
@@ -84,14 +98,50 @@ public class OdooAccountQuickManage extends ActionBarActivity implements View.On
         }
     }
 
+    private void removePassword() {
+        OdooAccountManager.removeAccount(getApplicationContext(), account.name);
+        finish();
+    }
+
     private void savePassword() {
-        EditText edtPassword = (EditText) findViewById(R.id.newPassword);
+        edtPassword = (EditText) findViewById(R.id.newPassword);
         edtPassword.setError(null);
         if (TextUtils.isEmpty(edtPassword.getText())) {
             edtPassword.setError("Password required");
             edtPassword.requestFocus();
         }
-        Toast.makeText(this, "Password Saved", Toast.LENGTH_LONG).show();
-        finish();
+        mUser.setPassword(edtPassword.getText().toString());
+        loginProcess = new LoginProcess();
+        loginHelper = new OdooLoginHelper(getApplicationContext());
+        loginProcess.execute(mUser.getDBName(), mUser.getHost());
+    }
+
+    private class LoginProcess extends AsyncTask<String, Void, OUser> {
+
+
+        @Override
+        protected OUser doInBackground(String... params) {
+
+            try {
+                return loginHelper.login(mUser.getUsername(), mUser.getPassword(), mUser.getDatabase(), params[1], mUser.isAllowSelfSignedSSL());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(OUser oUser) {
+            super.onPostExecute(oUser);
+            if (oUser != null) {
+                // Valid Login
+                OdooAccountManager.updateUserData(OdooAccountQuickManage.this, mUser);
+                finish();
+            } else {
+                edtPassword.setText("");
+                edtPassword.setError("Password required");
+                // Invalid password
+            }
+        }
     }
 }
