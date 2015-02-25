@@ -19,8 +19,9 @@
  */
 package com.odoo.core.account;
 
-import android.accounts.Account;
-import android.accounts.AccountManager;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -32,6 +33,7 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.odoo.OdooActivity;
 import com.odoo.core.auth.OdooAccountManager;
 import com.odoo.core.service.OSyncAdapter;
 import com.odoo.core.support.OUser;
@@ -46,7 +48,6 @@ public class OdooAccountQuickManage extends ActionBarActivity implements View.On
     private OUser mUser = null;
     private ImageView userAvatar;
     private TextView txvName;
-    private Account account;
     private OdooLoginHelper loginHelper;
     private LoginProcess loginProcess = null;
     private EditText edtPassword;
@@ -59,13 +60,12 @@ public class OdooAccountQuickManage extends ActionBarActivity implements View.On
         getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         getSupportActionBar().hide();
         action = getIntent().getAction();
-        OLog.log(">>>  " + action);
         // Removing notification
         ONotificationBuilder.cancelNotification(this, OSyncAdapter.REQUEST_SIGN_IN_ERROR);
         mUser = OdooAccountManager.getDetails(this, getIntent().getStringExtra("android_name"));
         if (action.equals("remove_account")) {
             removePassword();
-        } else {
+        } else if (action.equals("reset_password")) {
             init();
             findViewById(R.id.cancel).setOnClickListener(this);
             findViewById(R.id.save_password).setOnClickListener(this);
@@ -81,8 +81,6 @@ public class OdooAccountQuickManage extends ActionBarActivity implements View.On
         userAvatar.setImageBitmap(userImage);
         txvName = (TextView) findViewById(R.id.userName);
         txvName.setText(mUser.getName());
-        Account[] accounts = AccountManager.get(getApplicationContext()).getAccountsByType(OdooAccountManager.KEY_ACCOUNT_TYPE);
-        account = accounts[0];
     }
 
     @Override
@@ -99,8 +97,24 @@ public class OdooAccountQuickManage extends ActionBarActivity implements View.On
     }
 
     private void removePassword() {
-        OdooAccountManager.removeAccount(getApplicationContext(), account.name);
-        finish();
+        AlertDialog.Builder builder = new AlertDialog.Builder(OdooAccountQuickManage.this);
+        builder = new AlertDialog.Builder(this);
+        builder.setTitle(R.string.title_confirm);
+        builder.setMessage(R.string.toast_are_you_sure_delete_account);
+        builder.setPositiveButton(R.string.label_delete, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                OdooAccountManager.removeAccount(OdooAccountQuickManage.this, mUser.getAndroidName());
+                finish();
+            }
+        });
+        builder.setNegativeButton(R.string.label_cancel, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.dismiss();
+            }
+        });
+        builder.show();
     }
 
     private void savePassword() {
@@ -137,6 +151,11 @@ public class OdooAccountQuickManage extends ActionBarActivity implements View.On
                 // Valid Login
                 OdooAccountManager.updateUserData(OdooAccountQuickManage.this, mUser);
                 finish();
+                Intent intent = new Intent(OdooAccountQuickManage.this, OdooActivity.class);
+                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getApplicationContext().startActivity(intent);
             } else {
                 edtPassword.setText("");
                 edtPassword.setError("Password required");

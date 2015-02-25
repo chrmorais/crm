@@ -82,7 +82,7 @@
         jar="/home/sla/odoo-mobile/master-crm-studio-add-sla/app/build/intermediates/exploded-aar/master-crm-studio-add-sla/intro-slider-lib/unspecified/classes.jar"
         jumboMode="false"
         revision="21.1.2"
-        sha1="7f8e24706f3ee853105b3f0630a543840dece1a1">
+        sha1="613aeff71a42758111a259f98510b57e2ae8de0d">
         <dex dex="/home/sla/odoo-mobile/master-crm-studio-add-sla/app/build/intermediates/pre-dexed/debug/classes-303f6e3c49dd8c44f872788fe46762f48d91f7fb.jar" />
     </item>
     <item
